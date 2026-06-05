@@ -1,0 +1,51 @@
+ # Data folders (your request)
+data/
+*.csv
+*.xlsx
+*.xls
+*.parquet
+*.db
+*.sqlite
+
+# Virtual environments
+streamlit_env/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Streamlit specific
+.streamlit/secrets.toml
+.streamlit/config.toml
+
+# IDE and OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.venv
+secrets.toml
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Logs and databases
+*.log
+*.pid
+*.seed
+
+# Local configuration
+config.local.py
