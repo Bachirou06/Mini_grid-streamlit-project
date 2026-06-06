@@ -1,139 +1,97 @@
-# utils/data_loader.py
-import pandas as pd
-import numpy as np
-import streamlit as st
 import os
+import pandas as pd
+import streamlit as st
+
+from config import DATA_PATH, COL, VIABILITY_WEIGHTS
 
 
-@st.cache_data
+@st.cache_data(show_spinner="Loading VIDA cleaned data…")
 def load_data() -> pd.DataFrame:
-    """Load Niger VIDA data from Excel file"""
-
-    # ✅ Get absolute path automatically
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    filepath = os.path.join(base_dir, "data", "Niger VIDA tool.xlsx")
-
-    # Check if file exists
-    if not os.path.exists(filepath):
-        st.error(f"❌ File not found at: {filepath}")
-        st.stop()
-
-    try:
-        # ✅ Try different header rows to find the correct one
-        # Read first 10 rows to inspect
-        df_preview = pd.read_excel(
-            filepath,
-            sheet_name=0,
-            engine="openpyxl",
-            header=None,  # No header, read raw
-            nrows=10
+    if not os.path.exists(DATA_PATH):
+        raise FileNotFoundError(
+            f"Missing cleaned file: {DATA_PATH}\n\n"
+            "Run first: python prepare_vida_data.py"
         )
 
-        st.write("📋 First 10 rows (raw):")
-        st.dataframe(df_preview)
+    df = pd.read_parquet(DATA_PATH)
 
-        # ✅ Try header at row index 1 (second row)
-        df_row1 = pd.read_excel(
-            filepath,
-            sheet_name=0,
-            engine="openpyxl",
-            header=1  # Second row as header
+    # Strip column names (extra safety)
+    df.columns = [str(c).strip() for c in df.columns]
+
+    # Ensure coords exist
+    if COL["lat"] not in df.columns or COL["lon"] not in df.columns:
+        raise KeyError(
+            f"Columns {COL['lat']}/{COL['lon']} not found in cleaned parquet.\n"
+            f"Found: {df.columns.tolist()}"
         )
-        st.write("📋 Columns with header=1:", df_row1.columns.tolist())
 
-        # ✅ Try header at row index 2 (third row)
-        df_row2 = pd.read_excel(
-            filepath,
-            sheet_name=0,
-            engine="openpyxl",
-            header=2  # Third row as header
-        )
-        st.write("📋 Columns with header=2:", df_row2.columns.tolist())
+    # Cast coords numeric
+    df[COL["lat"]] = pd.to_numeric(df[COL["lat"]], errors="coerce")
+    df[COL["lon"]] = pd.to_numeric(df[COL["lon"]], errors="coerce")
+    df = df.dropna(subset=[COL["lat"], COL["lon"]]).copy()
 
-        # ✅ Try header at row index 3 (fourth row)
-        df_row3 = pd.read_excel(
-            filepath,
-            sheet_name=0,
-            engine="openpyxl",
-            header=3  # Fourth row as header
-        )
-        st.write("📋 Columns with header=3:", df_row3.columns.tolist())
-
-    except Exception as e:
-        st.error(f"❌ Error reading Excel file: {e}")
-        st.stop()
-
-    st.stop()  # Stop here to inspect results
-    return pd.DataFrame()
-
-
-def clean_data(df: pd.DataFrame) -> pd.DataFrame:
-    """Clean and preprocess data"""
-
-    # Drop rows without coordinates
-    df = df.dropna(subset=["Latitude", "Longitude"])
-
-    # Numeric columns
+    # Cast numeric columns used by filters/score (if present)
     numeric_cols = [
-        "Nombre estimé de connexions",
-        "Demande énergétique estimée [kWh/day]",
-        "Production PV potentielle [kWh/kWp]",
-        "Distance au réseau existant [km]",
-        "Éclairage nocturne [%]",
-        "Population",
-        "Indice de richesse relative",
-        "Superficie agricole totale [ha]",
-        "Valeur totale des cultures [$/year]"
+        COL.get("connections"),
+        COL.get("demand"),
+        COL.get("pv"),
+        COL.get("dist_grid"),
+        COL.get("nightlight"),
+        COL.get("pop"),
+        COL.get("wealth"),
+        COL.get("incidents_50"),
     ]
+    for c in numeric_cols:
+        if c and c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
 
-    for col in numeric_cols:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
+    # Compute viability score
+    df["Score_Viabilité"] = compute_viability_score(df)
 
-    # Viability score
-    df["Score_Viabilité"] = calculate_viability_score(df)
+    # Simple class
+    df["Viabilité_Classe"] = pd.cut(
+        df["Score_Viabilité"],
+        bins=[0, 25, 50, 75, 100],
+        labels=["Faible", "Modérée", "Bonne", "Excellente"],
+        include_lowest=True,
+    )
 
-    return df
+    return df.reset_index(drop=True)
 
 
-def calculate_viability_score(df: pd.DataFrame) -> pd.Series:
-    """Calculate a viability score from 0 to 100"""
+def normalize(series: pd.Series) -> pd.Series:
+    series = series.fillna(0)
+    mn, mx = series.min(), series.max()
+    if mx == mn:
+        return pd.Series(0.5, index=series.index)
+    return (series - mn) / (mx - mn)
+
+
+def compute_viability_score(df: pd.DataFrame) -> pd.Series:
     score = pd.Series(0.0, index=df.index)
 
-    if "Nombre estimé de connexions" in df.columns:
-        score += normalize(df["Nombre estimé de connexions"]) * 25
-
-    if "Demande énergétique estimée [kWh/day]" in df.columns:
-        score += normalize(df["Demande énergétique estimée [kWh/day]"]) * 25
-
-    if "Production PV potentielle [kWh/kWp]" in df.columns:
-        score += normalize(df["Production PV potentielle [kWh/kWp]"]) * 25
-
-    if "Indice de richesse relative" in df.columns:
-        score += normalize(df["Indice de richesse relative"]) * 25
+    for key, weight in VIABILITY_WEIGHTS.items():
+        colname = COL.get(key)
+        if colname and colname in df.columns:
+            score += normalize(df[colname]) * (weight * 100)
 
     return score.round(2)
 
 
-def normalize(series: pd.Series) -> pd.Series:
-    """Normalize a series between 0 and 1"""
-    min_val = series.min()
-    max_val = series.max()
-    if max_val == min_val:
-        return pd.Series(0.5, index=series.index)
-    return (series - min_val) / (max_val - min_val)
+def get_kpis(df: pd.DataFrame) -> dict:
+    def safe_sum(col):
+        return float(df[col].sum()) if col in df.columns else 0.0
 
+    def safe_mean(col):
+        return float(df[col].mean()) if col in df.columns else 0.0
 
-def get_summary_stats(df: pd.DataFrame) -> dict:
-    """Get summary statistics"""
     return {
-        "total_sites": len(df),
-        "total_population": df["Population"].sum()
-        if "Population" in df.columns else 0,
-        "avg_connections": df["Nombre estimé de connexions"].mean()
-        if "Nombre estimé de connexions" in df.columns else 0,
-        "avg_demand": df["Demande énergétique estimée [kWh/day]"].mean()
-        if "Demande énergétique estimée [kWh/day]" in df.columns else 0,
-        "regions": df["Région"].nunique()
-        if "Région" in df.columns else 0
+        "total_sites": int(len(df)),
+        "total_pop": int(safe_sum(COL["pop"])) if COL["pop"] in df.columns else 0,
+        "avg_connections": safe_mean(COL["connections"]),
+        "avg_demand": safe_mean(COL["demand"]),
+        "avg_score": float(df["Score_Viabilité"].mean()) if "Score_Viabilité" in df.columns else 0.0,
+        "high_risk_pct": float(
+            df[COL["risk"]].isin(["Élevé", "Très élevé"]).mean() * 100
+        ) if COL["risk"] in df.columns else 0.0,
     }

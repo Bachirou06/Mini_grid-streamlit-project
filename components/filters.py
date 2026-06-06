@@ -1,106 +1,87 @@
-# components/filters.py
 import streamlit as st
 import pandas as pd
-from config import COLUMNS
+from config import COL
 
 
-def render_filters(df: pd.DataFrame) -> pd.DataFrame:
-    """Render sidebar filters and return filtered dataframe"""
+def render_filters(df: pd.DataFrame):
+    st.sidebar.title("Filters")
 
-    st.sidebar.title("🔍 Filtres")
+    filtered = df.copy()
 
-    filtered_df = df.copy()
+    # Location
+    with st.sidebar.expander("Location", expanded=True):
+        if COL["region"] in filtered.columns:
+            regions = ["All"] + sorted(filtered[COL["region"]].dropna().unique().tolist())
+            sel_region = st.selectbox("Region", regions)
+            if sel_region != "All":
+                filtered = filtered[filtered[COL["region"]] == sel_region]
 
-    # ---- Region Filter ----
-    st.sidebar.subheader("📍 Localisation")
+        if COL["dept"] in filtered.columns:
+            depts = ["All"] + sorted(filtered[COL["dept"]].dropna().unique().tolist())
+            sel_dept = st.selectbox("Department", depts)
+            if sel_dept != "All":
+                filtered = filtered[filtered[COL["dept"]] == sel_dept]
 
-    if "Région" in df.columns:
-        regions = ["Toutes"] + sorted(df["Région"].dropna().unique().tolist())
-        selected_region = st.sidebar.selectbox("Région", regions)
-        if selected_region != "Toutes":
-            filtered_df = filtered_df[filtered_df["Région"] == selected_region]
+    # Score
+    with st.sidebar.expander("Viability score", expanded=True):
+        score_range = st.slider("Score range", 0, 100, (0, 100), step=5)
+        filtered = filtered[filtered["Score_Viabilité"].between(score_range[0], score_range[1])]
 
-    if "Départment" in df.columns:
-        depts = ["Tous"] + sorted(
-            filtered_df["Départment"].dropna().unique().tolist()
-        )
-        selected_dept = st.sidebar.selectbox("Département", depts)
-        if selected_dept != "Tous":
-            filtered_df = filtered_df[filtered_df["Départment"] == selected_dept]
+        if "Viabilité_Classe" in filtered.columns:
+            classes = [c for c in filtered["Viabilité_Classe"].dropna().unique().tolist()]
+            if classes:
+                sel_classes = st.multiselect("Class", classes, default=classes)
+                if sel_classes:
+                    filtered = filtered[filtered["Viabilité_Classe"].isin(sel_classes)]
 
-    # ---- Energy Filter ----
-    st.sidebar.subheader("⚡ Énergie")
+    # Energy
+    with st.sidebar.expander("Energy", expanded=False):
+        if COL["connections"] in filtered.columns:
+            s = filtered[COL["connections"]].dropna()
+            if not s.empty:
+                mn, mx = int(s.min()), int(s.max())
+                r = st.slider("Connections", mn, mx, (mn, mx))
+                filtered = filtered[filtered[COL["connections"]].between(r[0], r[1])]
 
-    if "Nombre estimé de connexions" in df.columns:
-        min_conn = int(df["Nombre estimé de connexions"].min())
-        max_conn = int(df["Nombre estimé de connexions"].max())
-        conn_range = st.sidebar.slider(
-            "Connexions estimées",
-            min_conn, max_conn,
-            (min_conn, max_conn)
-        )
-        filtered_df = filtered_df[
-            (filtered_df["Nombre estimé de connexions"] >= conn_range[0]) &
-            (filtered_df["Nombre estimé de connexions"] <= conn_range[1])
-        ]
+        if COL["demand"] in filtered.columns:
+            s = filtered[COL["demand"]].dropna()
+            if not s.empty:
+                mn, mx = float(s.min()), float(s.max())
+                r = st.slider("Demand (kWh/day)", mn, mx, (mn, mx))
+                filtered = filtered[filtered[COL["demand"]].between(r[0], r[1])]
 
-    if "Demande énergétique estimée [kWh/day]" in df.columns:
-        min_d = float(df["Demande énergétique estimée [kWh/day]"].min())
-        max_d = float(df["Demande énergétique estimée [kWh/day]"].max())
-        demand_range = st.sidebar.slider(
-            "Demande énergétique (kWh/day)",
-            min_d, max_d,
-            (min_d, max_d)
-        )
-        filtered_df = filtered_df[
-            (filtered_df["Demande énergétique estimée [kWh/day]"] >= demand_range[0]) &
-            (filtered_df["Demande énergétique estimée [kWh/day]"] <= demand_range[1])
-        ]
+        if COL["dist_grid"] in filtered.columns:
+            s = filtered[COL["dist_grid"]].dropna()
+            if not s.empty:
+                mn, mx = float(s.min()), float(s.max())
+                r = st.slider("Distance to grid (km)", mn, mx, (mn, mx))
+                filtered = filtered[filtered[COL["dist_grid"]].between(r[0], r[1])]
 
-    # ---- Security Filter ----
-    st.sidebar.subheader("🛡️ Sécurité")
+    # Security
+    with st.sidebar.expander("Security", expanded=False):
+        if COL["risk"] in filtered.columns:
+            levels = df[COL["risk"]].dropna().unique().tolist()
+            sel = st.multiselect("Risk level", levels, default=levels)
+            if sel:
+                filtered = filtered[filtered[COL["risk"]].isin(sel)]
 
-    if "Risque de sécurité" in df.columns:
-        risk_levels = df["Risque de sécurité"].dropna().unique().tolist()
-        selected_risks = st.sidebar.multiselect(
-            "Niveau de risque",
-            risk_levels,
-            default=risk_levels
-        )
-        if selected_risks:
-            filtered_df = filtered_df[
-                filtered_df["Risque de sécurité"].isin(selected_risks)
-            ]
-
-    # ---- Viability Score ----
-    st.sidebar.subheader("🏆 Score de Viabilité")
-
-    score_range = st.sidebar.slider(
-        "Score minimum",
-        0, 100,
-        (0, 100)
-    )
-    filtered_df = filtered_df[
-        (filtered_df["Score_Viabilité"] >= score_range[0]) &
-        (filtered_df["Score_Viabilité"] <= score_range[1])
-    ]
-
-    # ---- Map Options ----
-    st.sidebar.subheader("🗺️ Options Carte")
-
-    color_by = st.sidebar.selectbox(
-        "Colorier par",
-        ["Score_Viabilité", "Risque de sécurité",
-         "Éclairage nocturne [%]", "Population"]
-    )
-
-    map_style = st.sidebar.selectbox(
-        "Style de carte",
-        ["OpenStreetMap", "Satellite", "Terrain", "Dark"]
-    )
-
-    # Results count
+    # Map options
     st.sidebar.markdown("---")
-    st.sidebar.metric("Sites affichés", len(filtered_df))
+    with st.sidebar.expander("Map options", expanded=True):
+        color_by = st.selectbox(
+            "Color by",
+            ["Score_Viabilité", COL["risk"], COL["pop"], COL["demand"], COL["nightlight"], COL["wealth"]],
+        )
+        size_by = st.selectbox(
+            "Size by",
+            [COL["pop"], COL["connections"], COL["demand"], "Fixed size"],
+        )
+        map_style = st.selectbox(
+            "Basemap",
+            ["OpenStreetMap", "Satellite", "Terrain", "Dark"],
+        )
 
-    return filtered_df, color_by, map_style
+    st.sidebar.markdown("---")
+    st.sidebar.metric("Sites shown", f"{len(filtered):,} / {len(df):,}")
+
+    return filtered, color_by, size_by, map_style
