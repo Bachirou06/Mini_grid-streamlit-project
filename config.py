@@ -1,13 +1,36 @@
+# config.py
 import os
+from PIL import Image
+import logging
 
-APP_TITLE = "VIDA Niger – Mini-grid Webmap"
-APP_ICON = "⚡"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+logger = logging.getLogger(__name__)
+
+APP_TITLE = "SEEC Niger – Mini-grid Webmap"
+
+# Load logo with fallback
+LOGO_PATH = os.path.join(BASE_DIR, "assets", "seec_icon.jpeg")
+#try:
+if os.path.exists(LOGO_PATH):
+        #logo_img = Image.open(LOGO_PATH)
+    APP_ICON = LOGO_PATH
+        # Resize to square (256x256) for browser tab
+        # APP_ICON = logo_img.resize((512, 512), Image.Resampling.LANCZOS)
+        # APP_ICON = Image.open(LOGO_PATH)
+    logger.info(f"✅ Logo loaded: {LOGO_PATH}")
+        #else:
+        #raise FileNotFoundError(f"Logo not found at {LOGO_PATH}")
+        #logger.warning(f"⚠️ Could not load logo: {e}. Using emoji fallback.")
+        # except Exception as e:
+        #APP_ICON = "⚡"
+else:
+    logger.warning(f"⚠️ Logo not found at {LOGO_PATH}. Using emoji fallback.")
+    APP_ICON = "⚡"
+
 APP_LAYOUT = "wide"
 ENABLE_CHARTS = True
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Plan B: Streamlit loads parquet (fast). Excel is only used by prepare_vida_data.py
 DATA_PATH = os.path.join(BASE_DIR, "data", "vida_clean.parquet")
+APP_TITLE = " SEEC Niger – Mini-grid Webmap"
 
 # Map defaults (Niger)
 MAP_CENTER = [17.6078, 8.0817]
