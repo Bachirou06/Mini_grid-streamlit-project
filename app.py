@@ -1,9 +1,8 @@
 # app.py
 import streamlit as st
-from streamlit_folium import st_folium
-
+# import streamlit.components.v1 as components
+import base64
 from config import APP_TITLE, APP_ICON, APP_LAYOUT, COL
-from config import APP_TITLE, APP_ICON, APP_LAYOUT
 from utils.data_loader import load_data, get_kpis
 from components.filters import render_filters
 from components.map import create_folium_map
@@ -27,8 +26,14 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title(f"{APP_ICON} {APP_TITLE}")
-st.caption("Niger – Mini-grid viability webmap ")
+# 🎯 DISPLAY LOGO IN PAGE HEADER using HTML
+# 🎯 DISPLAY LOGO AND TITLE CENTERED (Perfectly aligned)
+st.markdown(f"""
+<div style="display: flex; align-items: center; justify-content: center; gap: 20px; margin-bottom: 20px;">
+    <img src="{APP_ICON}" width="160" height="160" style="border-radius: 8px; flex-shrink: 0;">
+    <h1 style="margin: 0; color: #0f3460; line-height: 1; display: flex; align-items: center;">{APP_TITLE}</h1>
+</div>
+""", unsafe_allow_html=True)
 
 # Load data (cached)
 df = load_data()
@@ -71,12 +76,15 @@ with tab_map:
             f"Sized by **{size_by}**"
         )
 
-        st_folium(
-            m,
-            height=650,
-            width=None,
-            returned_objects=[],
-        )
+        # ✅ CHANGED: Use native folium instead of st_folium
+        #map_html = m._repr_html_()
+        #components.html(map_html, height=650)
+
+        # ✅ UPDATED: Use st.iframe with base64 encoding
+        map_html = m._repr_html_()
+        b64 = base64.b64encode(map_html.encode()).decode()
+        iframe_src = f'data:text/html;base64,{b64}'
+        st.iframe(iframe_src, height=650)
 
 # DATA TAB
 with tab_data:
