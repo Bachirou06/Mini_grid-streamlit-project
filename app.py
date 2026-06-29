@@ -1,14 +1,11 @@
+# app.py
 import streamlit as st
-from streamlit_folium import st_folium
-
-from config import APP_TITLE, APP_ICON, APP_LAYOUT, ENABLE_CHARTS
+# import streamlit.components.v1 as components
+import base64
+from config import APP_TITLE, APP_ICON, APP_LAYOUT, COL
 from utils.data_loader import load_data, get_kpis
 from components.filters import render_filters
-from components.map import create_map
-from config import ENABLE_CHARTS
-if ENABLE_CHARTS:
-    from components.charts import render_charts
-
+from components.map import create_folium_map
 
 st.set_page_config(
     page_title=APP_TITLE,
@@ -17,52 +14,108 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-st.title(f"{APP_ICON} {APP_TITLE}")
-st.caption("Plan B: app loads pre-cleaned parquet (no upload).")
+# CSS
+st.markdown("""
+<style>
+  [data-testid="stMetric"] {
+    background:#f8f9fa;
+    border-radius:10px;
+    padding:10px;
+    border-left:4px solid #0f3460;
+  }
+</style>
+""", unsafe_allow_html=True)
 
-# Load data
-try:
-    df = load_data()
-except Exception as e:
-    st.error(str(e))
-    st.stop()
+# 🎯 DISPLAY LOGO IN PAGE HEADER using HTML
+# 🎯 DISPLAY LOGO AND TITLE CENTERED (Perfectly aligned)
+st.markdown(f"""
+<div style="display: flex; align-items: center; justify-content: center; gap: 20px; margin-bottom: 20px;">
+    <img src="{APP_ICON}" width="160" height="160" style="border-radius: 8px; flex-shrink: 0;">
+    <h1 style="margin: 0; color: #0f3460; line-height: 1; display: flex; align-items: center;">{APP_TITLE}</h1>
+</div>
+""", unsafe_allow_html=True)
 
-# Filters
-filtered_df, color_by, size_by, map_style = render_filters(df)
+# Load data (cached)
+df = load_data()
 
-# KPIs
+# Filters (Apply button prevents constant rerun)
+filtered_df, color_by, size_by, map_style, max_points, show_popups = render_filters(df)
+
+# KPIs on full filtered data
 kpis = get_kpis(filtered_df)
+
 c1, c2, c3, c4, c5, c6 = st.columns(6)
-c1.metric("Sites", f"{kpis['total_sites']:,}")
-c2.metric("Population", f"{kpis['total_pop']:,}")
-c3.metric("Avg demand", f"{kpis['avg_demand']:.1f}")
-c4.metric("Avg connections", f"{kpis['avg_connections']:.0f}")
-c5.metric("Avg score", f"{kpis['avg_score']:.1f}/100")
-c6.metric("High risk %", f"{kpis['high_risk_pct']:.1f}%")
+c1.metric("🏘️ Sites",         f"{kpis['total_sites']:,}")
+c2.metric("👥 Population",    f"{kpis['total_pop']:,}")
+c3.metric("⚡ Avg demand",    f"{kpis['avg_demand']:.1f} kWh/d")
+c4.metric("🔌 Avg conn.",     f"{kpis['avg_connections']:.0f}")
+c5.metric("🏆 Avg score",     f"{kpis['avg_score']:.1f}/100")
+c6.metric("⚠️ High risk",     f"{kpis['high_risk_pct']:.1f}%")
 
 st.divider()
 
-# Tabs
-if ENABLE_CHARTS:
-    tab_map, tab_charts, tab_data = st.tabs(["Map", "Charts", "Data"])
-else:
-    tab_map, tab_data = st.tabs(["Map", "Data"])
+tab_map, tab_data = st.tabs(["🗺️ Map", "📋 Data"])
 
+# MAP TAB
 with tab_map:
     if filtered_df.empty:
-        st.warning("No sites match your filters.")
+        st.warning("⚠️ No sites match your current filters.")
     else:
-        m = create_map(filtered_df, color_by=color_by, size_by=size_by, map_style=map_style)
-        st_folium(m, width=None, height=650)
+        m, n_drawn = create_folium_map(
+            filtered_df,
+            color_by=color_by,
+            size_by=size_by,
+            map_style=map_style,
+            max_points=max_points,
+            show_popups=show_popups,
+        )
 
-if ENABLE_CHARTS:
-    with tab_charts:
-        if filtered_df.empty:
-            st.warning("No data to chart (adjust filters).")
-        else:
-            render_charts(filtered_df)
+        st.caption(
+            f"🗺️ Drawing **{n_drawn:,}** of **{len(filtered_df):,}** filtered sites | "
+            f"Colored by **{color_by}** | "
+            f"Sized by **{size_by}**"
+        )
 
+        # ✅ CHANGED: Use native folium instead of st_folium
+        #map_html = m._repr_html_()
+        #components.html(map_html, height=650)
+
+        # ✅ UPDATED: Use st.iframe with base64 encoding
+        map_html = m._repr_html_()
+        b64 = base64.b64encode(map_html.encode()).decode()
+        iframe_src = f'data:text/html;base64,{b64}'
+        st.iframe(iframe_src, height=650)
+
+# DATA TAB
 with tab_data:
-    st.dataframe(filtered_df, use_container_width=True, height=520)
-    csv = filtered_df.to_csv(index=False).encode("utf-8")
-    st.download_button("Download filtered CSV", csv, "vida_filtered.csv", "text/csv")
+    st.subheader("Filtered data table")
+
+    key_cols = [
+        COL["name"] if COL["name"] in filtered_df.columns else None,
+        COL["region"] if COL["region"] in filtered_df.columns else None,
+        COL["dept"] if COL["dept"] in filtered_df.columns else None,
+        COL["pop"] if COL["pop"] in filtered_df.columns else None,
+        COL["connections"] if COL["connections"] in filtered_df.columns else None,
+        COL["demand"] if COL["demand"] in filtered_df.columns else None,
+        COL["risk"] if COL["risk"] in filtered_df.columns else None,
+        "Score_Viabilité",
+        "Viabilité_Classe",
+    ]
+    key_cols = [c for c in key_cols if c and c in filtered_df.columns]
+
+    col_a, col_b = st.columns([4, 1])
+    with col_b:
+        csv = filtered_df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "⬇️ Download CSV",
+            data=csv,
+            file_name="vida_niger_filtered.csv",
+            mime="text/csv",
+        )
+
+    st.dataframe(
+        filtered_df[key_cols]
+          .sort_values("Score_Viabilité", ascending=False)
+          .reset_index(drop=True),
+        height=500,
+    )

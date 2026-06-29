@@ -22,7 +22,7 @@ def render_charts(df: pd.DataFrame):
     with tab1:
         if COL["demand"] in df.columns:
             fig = px.histogram(df, x=COL["demand"], nbins=30, title="Demand distribution (kWh/day)")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         else:
             st.info(f"Column not found: {COL['demand']}")
 
@@ -31,7 +31,7 @@ def render_charts(df: pd.DataFrame):
             agg = df.groupby(COL["region"])[COL["pop"]].sum().reset_index()
             fig = px.bar(agg, x=COL["region"], y=COL["pop"], title="Population by region")
             fig.update_xaxes(tickangle=-30)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         else:
             st.info("Population/Region columns not found.")
 
@@ -44,6 +44,6 @@ def render_charts(df: pd.DataFrame):
                 color_discrete_map=RISK_COLORS,
                 title="Sites by risk level"
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         else:
             st.info(f"Column not found: {COL['risk']}")

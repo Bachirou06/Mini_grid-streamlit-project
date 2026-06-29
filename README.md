@@ -1,4 +1,8 @@
+HEAD
 cc# ⚡ VIDA Niger – Mini-Grid Viability Webmap
+
+# ⚡ VIDA Niger – Mini-Grid Viability Webmap
+ feature/add_logo
 
 ![Python](https://img.shields.io/badge/Python-3.11+-blue)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.32+-red)
@@ -370,4 +374,8 @@ See the [LICENSE](LICENSE) file for details.
 
 **ANPER – Agence Nigérienne pour la Promotion de l'Électrification Rurale**
 
+<<<<<<< HEAD
 > Built with ❤️ for rural electrification planning in Niger
+=======
+> Built with for rural electrification planning in Niger
+>>>>>>> feature/add_logo
