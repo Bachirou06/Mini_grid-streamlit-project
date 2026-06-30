@@ -49,3 +49,5 @@ secrets.toml
 
 # Local configuration
 config.local.py
+"__pycache__/" 
+"*.pyc" 

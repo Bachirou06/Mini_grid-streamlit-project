@@ -11,6 +11,7 @@ from config import (
 
 
 # ── Color helpers ─────────────────────────────────────────────────────────────
+
 def _nightlight_color(v) -> str:
     """Color for HEADER based on night-light (access to electricity)."""
     try:
@@ -18,11 +19,11 @@ def _nightlight_color(v) -> str:
     except Exception:
         return "#9e9e9e"
 
-    if v >= 75:  return "#0f3460"  # dark blue - Very high electrification
-    if v >= 50:  return "#1a5fb4"  # blue - High
-    if v >= 20:  return "#f39c12"  # orange - Medium
-    if v >= 5:   return "#e67e22"  # dark orange - Low
-    return "#922b21"  # dark red - Very low / No access
+    if v >= 75:  return "#0f3460"
+    if v >= 50:  return "#1a5fb4"
+    if v >= 20:  return "#f39c12"
+    if v >= 5:   return "#e67e22"
+    return "#922b21"
 
 
 def _score_color(v) -> str:
@@ -35,6 +36,45 @@ def _score_color(v) -> str:
     if v >= 50: return "#91cf60"
     if v >= 25: return "#fee08b"
     return "#d73027"
+
+
+def _demand_color(v) -> str:
+    """Color for energy demand based on value."""
+    try:
+        v = float(v)
+    except Exception:
+        return "#9e9e9e"
+
+    if v >= 1000: return "#800026"  # Very high - dark red
+    if v >= 500:  return "#e31a1c"  # High - red
+    if v >= 100:  return "#fc4e2a"  # Medium - orange
+    return "#fed976"  # Low - yellow
+
+
+def _wealth_color(v) -> str:
+    """Color for wealth index based on value."""
+    try:
+        v = float(v)
+    except Exception:
+        return "#9e9e9e"
+
+    if v >= 0.5:  return "#005a32"  # Very high - dark green
+    if v >= 0.0:  return "#238b45"  # High - green
+    if v >= -0.5: return "#74c476"  # Medium - light green
+    return "#c7e9c0"  # Low - very light green
+
+
+def _pop_color(v) -> str:
+    """Color for population based on value."""
+    try:
+        v = float(v)
+    except Exception:
+        return "#9e9e9e"
+
+    if v >= 10000: return "#08306b"  # Very high - dark blue
+    if v >= 5000:  return "#2171b5"  # High - blue
+    if v >= 1000:  return "#6baed6"  # Medium - light blue
+    return "#c6dbef"  # Low - very light blue
 
 
 def _normalize_risk(val) -> str:
@@ -64,20 +104,23 @@ def _get_color(row: pd.Series, color_by: str) -> str:
     if color_by == COL.get("risk"):
         val = row.get(COL["risk"], "")
         normalized_val = _normalize_risk(val)
-        return RISK_COLORS.get(normalized_val, "#9e9e9e")  # ✅ FIXED
+        return RISK_COLORS.get(normalized_val, "#9e9e9e")
 
     if color_by == COL.get("nightlight"):
         return _nightlight_color(row.get(COL["nightlight"], np.nan))
 
-    try:
-        v = float(row.get(color_by, np.nan))
-        if np.isnan(v):
-            return "#9e9e9e"
-        return "#3498db"
-    except Exception:
-        return "#3498db"
+    # ✅ NEW: Add color functions for demand, wealth, and population
+    if color_by == COL.get("demand"):
+        return _demand_color(row.get(COL["demand"], np.nan))
 
+    if color_by == COL.get("wealth"):
+        return _wealth_color(row.get(COL["wealth"], np.nan))
 
+    if color_by == COL.get("pop"):
+        return _pop_color(row.get(COL["pop"], np.nan))
+
+    # Default fallback
+    return "#9e9e9e"
 def _get_radius(row: pd.Series, size_by: str, vmax: float) -> float:
     """Get marker radius based on selected metric."""
     if size_by == "Fixed size":
@@ -90,8 +133,6 @@ def _get_radius(row: pd.Series, size_by: str, vmax: float) -> float:
         return float(max(3, min(16, r)))
     except Exception:
         return 6
-
-
 # ── Popup builder ─────────────────────────────────────────────────────────────
 def _make_popup(row: pd.Series) -> folium.Popup:
     """Create popup with night-light header and score bar."""
@@ -188,7 +229,7 @@ def _make_popup(row: pd.Series) -> folium.Popup:
             <td style="padding:3px 4px;"><b>{_v('dist_grid', 1)} km</b></td>
           </tr>
           <tr style="background:#f9f9f9;">
-            <td style="color:#555;padding:3px 4px;">⚡ Electricity access</td>
+            <td style="color:#555;padding:3px 4px;">⚡ Night time light </td>
             <td style="padding:3px 4px;">
               <span style="background:{header_color};
                            color:white;padding:2px 6px;
@@ -306,7 +347,7 @@ def _legend_html(color_by: str) -> str:
     return f"""
     <div style="
         position:fixed;
-        bottom:40px;right:12px;
+        top:50px;left:12px;
         z-index:9999;
         background:white;
         padding:12px 14px;

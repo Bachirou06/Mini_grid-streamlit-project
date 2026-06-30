@@ -1,7 +1,7 @@
 # app.py
 import streamlit as st
-# import streamlit.components.v1 as components
-import base64
+import os
+import tempfile
 from config import APP_TITLE, APP_ICON, APP_LAYOUT, COL
 from utils.data_loader import load_data, get_kpis
 from components.filters import render_filters
@@ -23,34 +23,42 @@ st.markdown("""
     padding:10px;
     border-left:4px solid #0f3460;
   }
+  /* Remove top padding to push logo to upper corner */
+  .block-container {
+    padding-top: 3rem !important;
+  }
 </style>
 """, unsafe_allow_html=True)
 
-# 🎯 DISPLAY LOGO IN PAGE HEADER using HTML
-# 🎯 DISPLAY LOGO AND TITLE CENTERED (Perfectly aligned)
-st.markdown(f"""
-<div style="display: flex; align-items: center; justify-content: center; gap: 20px; margin-bottom: 20px;">
-    <img src="{APP_ICON}" width="160" height="160" style="border-radius: 8px; flex-shrink: 0;">
-    <h1 style="margin: 0; color: #0f3460; line-height: 1; display: flex; align-items: center;">{APP_TITLE}</h1>
-</div>
-""", unsafe_allow_html=True)
+# 🎯 LOGO IN UPPER LEFT CORNER + TITLE ON THE RIGHT
+col_logo, col_title = st.columns([1, 5])
+with col_logo:
+    st.image(APP_ICON, width=100)
+with col_title:
+    st.markdown(f"""
+    <h1 style="color: #0f3460; margin-top: 15px;">
+        {APP_TITLE}
+    </h1>
+    """, unsafe_allow_html=True)
+
+st.caption("Niger – Mini-grid viability webmap")
 
 # Load data (cached)
 df = load_data()
 
-# Filters (Apply button prevents constant rerun)
+# Filters
 filtered_df, color_by, size_by, map_style, max_points, show_popups = render_filters(df)
 
-# KPIs on full filtered data
+# KPIs
 kpis = get_kpis(filtered_df)
 
 c1, c2, c3, c4, c5, c6 = st.columns(6)
-c1.metric("🏘️ Sites",         f"{kpis['total_sites']:,}")
-c2.metric("👥 Population",    f"{kpis['total_pop']:,}")
-c3.metric("⚡ Avg demand",    f"{kpis['avg_demand']:.1f} kWh/d")
-c4.metric("🔌 Avg conn.",     f"{kpis['avg_connections']:.0f}")
-c5.metric("🏆 Avg score",     f"{kpis['avg_score']:.1f}/100")
-c6.metric("⚠️ High risk",     f"{kpis['high_risk_pct']:.1f}%")
+c1.metric("🏘️ Sites",      f"{kpis['total_sites']:,}")
+c2.metric("👥 Population", f"{kpis['total_pop']:,}")
+c3.metric("⚡ Avg demand", f"{kpis['avg_demand']:.1f} kWh/d")
+c4.metric("🔌 Avg conn.",  f"{kpis['avg_connections']:.0f}")
+c5.metric("🏆 Avg score",  f"{kpis['avg_score']:.1f}/100")
+c6.metric("⚠️ High risk",  f"{kpis['high_risk_pct']:.1f}%")
 
 st.divider()
 
@@ -76,15 +84,12 @@ with tab_map:
             f"Sized by **{size_by}**"
         )
 
-        # ✅ CHANGED: Use native folium instead of st_folium
-        #map_html = m._repr_html_()
-        #components.html(map_html, height=650)
-
-        # ✅ UPDATED: Use st.iframe with base64 encoding
+        # ✅ TALLER MAP WINDOW (800px)
         map_html = m._repr_html_()
-        b64 = base64.b64encode(map_html.encode()).decode()
-        iframe_src = f'data:text/html;base64,{b64}'
-        st.iframe(iframe_src, height=650)
+        tmp_file = os.path.join(tempfile.gettempdir(), "vida_map.html")
+        with open(tmp_file, "w", encoding="utf-8") as f:
+            f.write(map_html)
+        st.iframe(tmp_file, height=800)
 
 # DATA TAB
 with tab_data:
