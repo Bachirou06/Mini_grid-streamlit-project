@@ -374,8 +374,7 @@ See the [LICENSE](LICENSE) file for details.
 
 **ANPER – Agence Nigérienne pour la Promotion de l'Électrification Rurale**
 
-<<<<<<< HEAD
-> Built with ❤️ for rural electrification planning in Niger
+Built for rural electrification planning in Niger
 =======
-> Built with for rural electrification planning in Niger
->>>>>>> feature/add_logo
+Built with for rural electrification planning in Niger
+ feature/add_logo
