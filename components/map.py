@@ -347,7 +347,7 @@ def _legend_html(color_by: str) -> str:
     return f"""
     <div style="
         position:fixed;
-        top:50px;left:12px;
+        top:70px;right:12px;
         z-index:9999;
         background:white;
         padding:12px 14px;
