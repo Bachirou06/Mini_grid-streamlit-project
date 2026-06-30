@@ -1,7 +1,7 @@
 HEAD
-cc# ⚡ VIDA Niger – Mini-Grid Viability Webmap
+cc# ⚡ Niger – Mini-Grid Viability Webmap
 
-# ⚡ VIDA Niger – Mini-Grid Viability Webmap
+# ⚡ Niger – Mini-Grid Viability Webmap
  feature/add_logo
 
 ![Python](https://img.shields.io/badge/Python-3.11+-blue)
@@ -11,7 +11,7 @@ cc# ⚡ VIDA Niger – Mini-Grid Viability Webmap
 
 A **Streamlit-based interactive webmap** for analyzing and visualizing
 the viability of mini-grid electrification sites across **Niger**,
-built on top of the **VIDA (Viability of electrification using
+built on top of the **(Viability of electrification using
 Decentralized Approaches)** dataset.
 
 ---
